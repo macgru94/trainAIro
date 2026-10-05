@@ -12,7 +12,8 @@ const anthropic = new Anthropic();
 export const MODELS = {
   daily: "claude-haiku-4-5", // analiza pojedynczego treningu
   weekly: "claude-sonnet-5-5", // podsumowanie tygodnia
-  cycle: "claude-opus-5-5", // plan cyklu (4 tygodnie)
+  chat: "claude-sonnet-5-5", // rozmowa na stronie „Trener”
+  cycle: "claude-opus-5-5", // plan cyklu, planów tygodni i ich poprawki
 } as const;
 
 export type CoachModel = (typeof MODELS)[keyof typeof MODELS];
@@ -31,6 +32,25 @@ export type CoachAnswer<T> = {
   inputTokens: number;
   outputTokens: number;
 };
+
+// Rozmowa z trenerem (Sonnet 5.5) – odpowiedź przesyłana na bieżąco (streaming).
+// `messages` to cała dotychczasowa rozmowa: wiadomości odtwarzamy dokładnie w takiej
+// postaci, w jakiej je zapisaliśmy (bez edycji) – tego wymaga model z myśleniem.
+export function streamCoachChat(system: string, messages: Anthropic.Beta.BetaMessageParam[]) {
+  return anthropic.beta.messages.stream({
+    model: MODELS.chat,
+    max_tokens: 16000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    thinking: { type: "adaptive" },
+    output_config: { effort: "medium" },
+    // Zapamiętuje (cache) dotychczasową rozmowę na kilka minut – kolejne
+    // wiadomości są wtedy dużo tańsze.
+    cache_control: { type: "ephemeral" },
+    system,
+    messages,
+  });
+}
 
 // Pytanie do trenera AI z odpowiedzią w stałym formacie (JSON zgodny ze schematem).
 export async function askCoach<T extends z.ZodType>({

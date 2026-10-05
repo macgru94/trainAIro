@@ -26,8 +26,15 @@ export default async function Home() {
         </p>
 
         <Link
-          href="/treningi"
+          href="/trener"
           className="mt-6 block w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-center font-medium text-white transition hover:bg-zinc-700"
+        >
+          Trener
+        </Link>
+
+        <Link
+          href="/treningi"
+          className="mt-3 block w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-center font-medium text-white transition hover:bg-zinc-700"
         >
           Treningi
         </Link>

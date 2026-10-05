@@ -129,6 +129,88 @@ function shiftDays(isoDate: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function todayIso() {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Warsaw" });
+}
+
+// Najbliższy poniedziałek (jeśli dziś poniedziałek – za tydzień).
+export function nextMonday(fromIso = todayIso()) {
+  const d = new Date(`${fromIso}T12:00:00Z`);
+  const day = d.getUTCDay(); // 0 = niedziela
+  d.setUTCDate(d.getUTCDate() + (((8 - day) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
+// „Teczka” dla trenera w rozmowie: profil, 4 tygodnie danych z analizami, kalendarz.
+export async function buildCoachSnapshot(supabase: SupabaseClient) {
+  const today = todayIso();
+  const from = shiftDays(today, -28);
+
+  const [{ data: wellnessRows }, { data: activityRows }, { data: analysisRows }, events] =
+    await Promise.all([
+      supabase
+        .from("wellness")
+        .select("raw")
+        .gte("date", from)
+        .order("date", { ascending: true }),
+      supabase
+        .from("activities")
+        .select("id, raw")
+        .gte("start_date_local", from)
+        .order("start_date_local", { ascending: true }),
+      supabase.from("activity_analyses").select("activity_id, verdict, data"),
+      getEvents(today, shiftDays(today, 14)),
+    ]);
+
+  const analyses = new Map(
+    (analysisRows ?? []).map((r) => [r.activity_id as string, r]),
+  );
+  const activities = (activityRows ?? []).map((r) => {
+    const raw = r.raw as IntervalsActivity;
+    const analysis = analyses.get(r.id as string);
+    return {
+      ...activitySummary(raw),
+      werdykt_analizy: analysis?.verdict ?? undefined,
+      wniosek_analizy: (analysis?.data as { podsumowanie?: string } | null)?.podsumowanie,
+    };
+  });
+
+  // Aktualny profil zawodnika bierzemy z ostatniej jazdy z mocą.
+  const lastRide = [...(activityRows ?? [])]
+    .reverse()
+    .map((r) => r.raw as IntervalsActivityDetail)
+    .find((a) => a.icu_ftp);
+  const profile = lastRide
+    ? {
+        ftp_w: lastRide.icu_ftp,
+        waga_kg: lastRide.icu_weight,
+        lthr: lastRide.lthr,
+        granice_stref_mocy_proc_ftp: lastRide.icu_power_zones,
+        granice_stref_tetna_bpm: lastRide.icu_hr_zones,
+      }
+    : null;
+
+  const planned = events.filter((e) => e.category === "WORKOUT").map(plannedSummary);
+  const wellness = (wellnessRows ?? []).map((r) => wellnessSummary(r.raw as IntervalsWellness));
+
+  return `# Dane zawodnika (stan na ${today})
+
+## Profil
+${profile ? JSON.stringify(profile) : "brak danych o FTP"}
+
+## Wellness – ostatnie 4 tygodnie (CTL = fitness, ATL = zmęczenie, TSB = świeżość)
+${lines(wellness) || "brak danych"}
+
+## Aktywności – ostatnie 4 tygodnie (z werdyktem analizy dziennej, jeśli była)
+${lines(activities) || "brak"}
+
+## Kalendarz intervals.icu – zaplanowane treningi na 14 dni
+${lines(planned) || "brak zaplanowanych treningów"}
+
+## Cykl treningowy
+Brak aktywnego cyklu. Pierwszy 4-tygodniowy cykl ma się zacząć w poniedziałek ${nextMonday(today)}.`;
+}
+
 export async function buildActivityAnalysisContext(
   supabase: SupabaseClient,
   activityId: string,
