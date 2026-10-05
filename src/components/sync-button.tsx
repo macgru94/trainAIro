@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { syncActivities } from "./actions";
+import { syncActivities } from "@/lib/sync";
 
 export function SyncButton() {
   const [state, formAction, pending] = useActionState(syncActivities, undefined);

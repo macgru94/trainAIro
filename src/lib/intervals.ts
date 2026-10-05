@@ -136,6 +136,39 @@ export async function getActivities(days = 30) {
   );
 }
 
+// Dane jednego dnia (wellness). id to data w formacie RRRR-MM-DD.
+export type IntervalsWellness = {
+  id: string;
+  ctl?: number | null; // fitness (forma długoterminowa)
+  atl?: number | null; // zmęczenie (ostatnie dni)
+  rampRate?: number | null;
+  weight?: number | null;
+  restingHR?: number | null;
+  hrv?: number | null;
+  sleepSecs?: number | null;
+  sleepScore?: number | null;
+  sleepQuality?: number | null;
+  steps?: number | null;
+  vo2max?: number | null;
+  soreness?: number | null;
+  fatigue?: number | null;
+  stress?: number | null;
+  mood?: number | null;
+  motivation?: number | null;
+  comments?: string | null;
+};
+
+export async function getWellness(days = 30) {
+  const { athleteId } = getConfig();
+  const newest = new Date();
+  const oldest = new Date();
+  oldest.setDate(newest.getDate() - days);
+
+  return intervalsFetch<IntervalsWellness[]>(
+    `/athlete/${athleteId}/wellness?oldest=${isoDate(oldest)}&newest=${isoDate(newest)}`,
+  );
+}
+
 export async function getActivity(id: string) {
   return intervalsFetch<IntervalsActivityDetail>(
     `/activity/${encodeURIComponent(id)}?intervals=true`,

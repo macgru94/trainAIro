@@ -32,6 +32,13 @@ export default async function Home() {
           Treningi
         </Link>
 
+        <Link
+          href="/forma"
+          className="mt-3 block w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-center font-medium text-white transition hover:bg-zinc-700"
+        >
+          Forma
+        </Link>
+
         <form action={logout} className="mt-3">
           <button
             type="submit"

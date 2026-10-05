@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isCycling, type IntervalsActivity } from "@/lib/intervals";
 import { formatDate, formatDistance, formatDuration } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
-import { SyncButton } from "./sync-button";
+import { SyncButton } from "@/components/sync-button";
 
 export default async function TreningiPage(props: PageProps<"/treningi">) {
   const { typ } = await props.searchParams;
