@@ -20,6 +20,23 @@ export type IntervalsActivity = {
   source?: string;
 };
 
+// Typy aktywności intervals.icu, które traktujemy jako jazdę na rowerze.
+const CYCLING_TYPES = new Set([
+  "Ride",
+  "VirtualRide",
+  "GravelRide",
+  "MountainBikeRide",
+  "EBikeRide",
+  "EMountainBikeRide",
+  "TrackRide",
+  "Velomobile",
+  "Handcycle",
+]);
+
+export function isCycling(activity: Pick<IntervalsActivity, "type">) {
+  return activity.type != null && CYCLING_TYPES.has(activity.type);
+}
+
 export type IntervalsInterval = {
   id: number;
   type?: string; // np. WORK, RECOVERY
