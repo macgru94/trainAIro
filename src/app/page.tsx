@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "./actions";
@@ -24,7 +25,14 @@ export default async function Home() {
           Tu wkrótce pojawią się Twoje treningi i analizy.
         </p>
 
-        <form action={logout} className="mt-6">
+        <Link
+          href="/treningi"
+          className="mt-6 block w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-center font-medium text-white transition hover:bg-zinc-700"
+        >
+          Treningi
+        </Link>
+
+        <form action={logout} className="mt-3">
           <button
             type="submit"
             className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 font-medium text-zinc-900 transition hover:bg-zinc-100"
