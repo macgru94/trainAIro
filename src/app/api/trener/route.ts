@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { logUsage } from "@/lib/ai-usage";
 import { streamCoachChat } from "@/lib/claude";
 import { buildCoachSnapshot } from "@/lib/coach-context";
 import { COACH_TOOLS, runCoachTool, TOOL_STATUS } from "@/lib/coach-tools";
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
           const claudeStream = streamCoachChat(CHAT_SYSTEM, messages, COACH_TOOLS);
           claudeStream.on("text", send);
           const final = await claudeStream.finalMessage();
+          await logUsage(supabase, "rozmowa", final.model, final.usage);
 
           let text = final.content
             .flatMap((b) => (b.type === "text" ? [b.text] : []))

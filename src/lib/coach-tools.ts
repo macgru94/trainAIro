@@ -2,10 +2,11 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { planCycle, planWeek, reviseWeek } from "@/lib/planning";
+import { WEEKDAYS } from "@/lib/analysis-schemas";
+import { moveWorkout, planCycle, planWeek, reviseWeek } from "@/lib/planning";
 
-// Narzędzia, które trener (Sonnet) może wywołać w rozmowie.
-// Każde z nich zleca pracę Opus 5.5 i zapisuje wynik w bazie.
+// Narzędzia, które trener (Sonnet) może wywołać w rozmowie. Wynik trafia do bazy.
+// Koszt: przesun_trening – bez AI; popraw_tydzien – Sonnet; plan cyklu/tygodnia – Opus.
 
 export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
@@ -48,9 +49,30 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "przesun_trening",
+    description:
+      "Natychmiastowa, darmowa zmiana bez przepisywania treningów: przesunięcie treningu na inny dzień (jeśli tam jest trening – zamiana miejscami), zamiana dwóch dni albo usunięcie treningu (dzień staje się odpoczynkiem). Zawsze używaj tego narzędzia zamiast popraw_tydzien, gdy wystarczy przestawić lub usunąć istniejące treningi.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        numer_tygodnia: { type: "integer", description: "Numer tygodnia w cyklu (1–4)." },
+        operacja: { type: "string", enum: ["przesun", "zamien", "usun"] },
+        z_dnia: { type: "string", enum: [...WEEKDAYS], description: "Dzień treningu, który zmieniamy." },
+        na_dzien: {
+          type: "string",
+          enum: [...WEEKDAYS, "brak"],
+          description: "Dzień docelowy (dla przesun/zamien); dla usun – „brak”.",
+        },
+      },
+      required: ["numer_tygodnia", "operacja", "z_dnia", "na_dzien"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "popraw_tydzien",
     description:
-      "Zleca poprawienie istniejącego planu tygodnia według prośby zawodnika (np. przesunięcie treningu, krótszy dzień, inny akcent).",
+      "Prosta poprawka treści treningów w rozpisanym tygodniu: krótszy/dłuższy trening, lżejsza intensywność, dodanie lekkiego treningu, inne interwały w jednym–dwóch dniach. Nie używaj do samego przestawiania dni (od tego jest przesun_trening). Gdy zmienia się dostępność w większości dni albo cały charakter tygodnia – zaplanuj tydzień od nowa (zaplanuj_tydzien).",
     strict: true,
     input_schema: {
       type: "object",
@@ -64,11 +86,12 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
   },
 ];
 
-// Komunikat dla zawodnika, gdy narzędzie rusza (Opus potrzebuje chwili).
+// Komunikat dla zawodnika, gdy narzędzie rusza.
 export const TOOL_STATUS: Record<string, string> = {
   zaplanuj_cykl: "⏳ Opus układa zarys cyklu… (do 2 minut)",
   zaplanuj_tydzien: "⏳ Opus rozpisuje plan tygodnia… (do 2 minut)",
-  popraw_tydzien: "⏳ Opus poprawia plan tygodnia… (do 2 minut)",
+  popraw_tydzien: "⏳ Poprawiam plan tygodnia… (kilkanaście sekund)",
+  przesun_trening: "⏳ Przestawiam treningi…",
 };
 
 const CycleInput = z.object({ cel: z.string().min(1), wymagania: z.string() });
@@ -78,6 +101,12 @@ const WeekInput = z.object({
   uwagi: z.string(),
 });
 const ReviseInput = z.object({ numer_tygodnia: z.number().int(), zmiany: z.string().min(1) });
+const MoveInput = z.object({
+  numer_tygodnia: z.number().int(),
+  operacja: z.enum(["przesun", "zamien", "usun"]),
+  z_dnia: z.enum(WEEKDAYS),
+  na_dzien: z.enum([...WEEKDAYS, "brak"]),
+});
 
 export async function runCoachTool(
   supabase: SupabaseClient,
@@ -93,6 +122,8 @@ export async function runCoachTool(
         return { content: await planWeek(supabase, userId, WeekInput.parse(input)), isError: false };
       case "popraw_tydzien":
         return { content: await reviseWeek(supabase, userId, ReviseInput.parse(input)), isError: false };
+      case "przesun_trening":
+        return { content: await moveWorkout(supabase, userId, MoveInput.parse(input)), isError: false };
       default:
         return { content: `Nieznane narzędzie: ${name}`, isError: true };
     }

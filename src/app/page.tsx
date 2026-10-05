@@ -46,6 +46,13 @@ export default async function Home() {
           Forma
         </Link>
 
+        <Link
+          href="/koszty"
+          className="mt-3 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-center font-medium text-zinc-900 transition hover:bg-zinc-100"
+        >
+          Koszty AI
+        </Link>
+
         <form action={logout} className="mt-3">
           <button
             type="submit"

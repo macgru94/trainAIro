@@ -59,6 +59,48 @@ export type CycleOutline = z.infer<typeof CycleOutlineSchema>;
 
 export const WEEKDAYS = ["pon", "wt", "sr", "czw", "pt", "sob", "nd"] as const;
 
+// Jeden dzień planu (trening z segmentami albo odpoczynek).
+export const DaySchema = z.object({
+  dzien: z.enum(WEEKDAYS),
+  rodzaj: z.enum(["trening", "odpoczynek"]),
+  nazwa: z.string().describe("Krótka nazwa, np. „Sweet Spot 3×12”, „Długa jazda Z2”, „Odpoczynek”."),
+  w_domu: z.boolean().describe("true = trenażer, false = jazda na dworze."),
+  czas_min: z.number().int().describe("Łączny czas treningu w minutach (0 dla odpoczynku)."),
+  cel: z.string().describe("1–2 zdania: po co ten trening i na co uważać (kadencja, odczucia…)."),
+  bloki: z
+    .array(
+      z.object({
+        powtorzenia: z.number().int().describe("Ile razy powtórzyć segmenty bloku (1 = bez powtórzeń)."),
+        segmenty: z.array(
+          z.object({
+            nazwa: z
+              .string()
+              .describe("Nazwa segmentu, 1–3 słowa, bez cyfr, np. „Rozgrzewka”, „Sweet Spot”, „Przerwa”, „Schłodzenie”."),
+            czas_s: z.number().int().describe("Czas segmentu w sekundach."),
+            moc_od_proc_ftp: z.number().int().describe("Dolna granica mocy w % FTP."),
+            moc_do_proc_ftp: z.number().int().describe("Górna granica mocy w % FTP (równa dolnej = stała moc)."),
+            narastajaco: z
+              .boolean()
+              .describe("true = moc rośnie płynnie od dolnej do górnej (np. rozgrzewka)."),
+            kadencja_od: z.number().int().describe("Dolna granica docelowej kadencji (rpm)."),
+            kadencja_do: z.number().int().describe("Górna granica docelowej kadencji (rpm)."),
+            odczucia: z
+              .string()
+              .describe(
+                "Jak organizm powinien się czuć w tym segmencie: RPE (1–10), oddech, czy da się swobodnie mówić, czucie w nogach. Jedno–dwa zdania.",
+              ),
+            wskazowki: z
+              .string()
+              .describe("Na czym się skupić: technika, pozycja, równe tempo, picie/jedzenie… Jedno zdanie."),
+          }),
+        ),
+      }),
+    )
+    .describe("Struktura treningu od rozgrzewki do schłodzenia. Pusta lista dla odpoczynku."),
+});
+
+export type PlanDay = z.infer<typeof DaySchema>;
+
 // Konkretny plan tygodnia (Opus). Moc w % FTP – zamieniamy ją na waty i na
 // format treningu intervals.icu po stronie aplikacji.
 export const WeekPlanSchema = z.object({
@@ -66,48 +108,17 @@ export const WeekPlanSchema = z.object({
   uzasadnienie: z
     .string()
     .describe("2–4 zdania: dlaczego tak, z odniesieniem do poprzednich tygodni, formy i dostępności."),
-  dni: z
-    .array(
-      z.object({
-        dzien: z.enum(WEEKDAYS),
-        rodzaj: z.enum(["trening", "odpoczynek"]),
-        nazwa: z.string().describe("Krótka nazwa, np. „Sweet Spot 3×12”, „Długa jazda Z2”, „Odpoczynek”."),
-        w_domu: z.boolean().describe("true = trenażer, false = jazda na dworze."),
-        czas_min: z.number().int().describe("Łączny czas treningu w minutach (0 dla odpoczynku)."),
-        cel: z.string().describe("1–2 zdania: po co ten trening i na co uważać (kadencja, odczucia…)."),
-        bloki: z
-          .array(
-            z.object({
-              powtorzenia: z.number().int().describe("Ile razy powtórzyć segmenty bloku (1 = bez powtórzeń)."),
-              segmenty: z.array(
-                z.object({
-                  nazwa: z
-                    .string()
-                    .describe("Nazwa segmentu, 1–3 słowa, bez cyfr, np. „Rozgrzewka”, „Sweet Spot”, „Przerwa”, „Schłodzenie”."),
-                  czas_s: z.number().int().describe("Czas segmentu w sekundach."),
-                  moc_od_proc_ftp: z.number().int().describe("Dolna granica mocy w % FTP."),
-                  moc_do_proc_ftp: z.number().int().describe("Górna granica mocy w % FTP (równa dolnej = stała moc)."),
-                  narastajaco: z
-                    .boolean()
-                    .describe("true = moc rośnie płynnie od dolnej do górnej (np. rozgrzewka)."),
-                  kadencja_od: z.number().int().describe("Dolna granica docelowej kadencji (rpm)."),
-                  kadencja_do: z.number().int().describe("Górna granica docelowej kadencji (rpm)."),
-                  odczucia: z
-                    .string()
-                    .describe(
-                      "Jak organizm powinien się czuć w tym segmencie: RPE (1–10), oddech, czy da się swobodnie mówić, czucie w nogach. Jedno–dwa zdania.",
-                    ),
-                  wskazowki: z
-                    .string()
-                    .describe("Na czym się skupić: technika, pozycja, równe tempo, picie/jedzenie… Jedno zdanie."),
-                }),
-              ),
-            }),
-          )
-          .describe("Struktura treningu od rozgrzewki do schłodzenia. Pusta lista dla odpoczynku."),
-      }),
-    )
-    .describe("Dokładnie 7 dni, od poniedziałku do niedzieli."),
+  dni: z.array(DaySchema).describe("Dokładnie 7 dni, od poniedziałku do niedzieli."),
 });
 
 export type WeekPlan = z.infer<typeof WeekPlanSchema>;
+
+// Prosta poprawka tygodnia (Sonnet): tylko dni, które się zmieniają.
+export const WeekEditSchema = z.object({
+  opis_zmian: z.string().describe("1–2 zdania: co zmieniono i dlaczego."),
+  dni: z
+    .array(DaySchema)
+    .describe("Tylko zmienione dni – każdy w pełnej postaci. Dni bez zmian pomiń."),
+});
+
+export type WeekEdit = z.infer<typeof WeekEditSchema>;

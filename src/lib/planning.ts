@@ -3,8 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   CycleOutlineSchema,
   WEEKDAYS,
+  WeekEditSchema,
   WeekPlanSchema,
   type CycleOutline,
+  type PlanDay,
   type WeekPlan,
 } from "@/lib/analysis-schemas";
 import { askCoach, MODELS } from "@/lib/claude";
@@ -136,9 +138,9 @@ export async function planCycle(
     system: PLANNER_SYSTEM,
     effort: "high",
     schema: CycleOutlineSchema,
-    prompt: `${snapshot}
-
-${reviews ? `# Podsumowania ostatnich tygodni\n${reviews}\n` : ""}
+    context: snapshot,
+    log: { supabase, operation: "plan_cyklu" },
+    prompt: `${reviews ? `# Podsumowania ostatnich tygodni\n${reviews}\n` : ""}
 # Zadanie
 Ułóż zarys nowego 4-tygodniowego cyklu treningowego, który zaczyna się w poniedziałek ${startDate}.
 
@@ -191,6 +193,8 @@ async function saveWeek(
   return weekStart;
 }
 
+// Dane do planowania tygodnia: „teczka” (stała, zapamiętywana w cache)
+// + cykl i poprzednie tygodnie.
 async function weekPlanningContext(supabase: SupabaseClient, cycle: Cycle, weekIndex: number) {
   const [snapshot, weeks, reviews] = await Promise.all([
     buildCoachSnapshot(supabase),
@@ -202,15 +206,34 @@ async function weekPlanningContext(supabase: SupabaseClient, cycle: Cycle, weekI
     .map((w) => `## Tydzień ${w.week_index} (od ${w.week_start}) – plan\n${weekToText(w.plan, w.week_start)}`)
     .join("\n\n");
 
-  return `${snapshot}
-
-# Aktualny cykl (start ${cycle.start_date})
+  const details = `# Aktualny cykl (start ${cycle.start_date})
 ${cycleToText(cycle)}
 
 # Poprzednie tygodnie tego cyklu – plany (porównaj z wykonaniem w aktywnościach)
 ${previous || "to pierwszy tydzień cyklu"}
 
 ${reviews ? `# Podsumowania tygodni\n${reviews}` : ""}`;
+
+  return { snapshot, details };
+}
+
+const REST_DAY = (dzien: PlanDay["dzien"]): PlanDay => ({
+  dzien,
+  rodzaj: "odpoczynek",
+  nazwa: "Odpoczynek",
+  w_domu: true,
+  czas_min: 0,
+  cel: "Regeneracja.",
+  bloki: [],
+});
+
+async function loadWeek(supabase: SupabaseClient, weekIndex: number) {
+  const cycle = await getActiveCycle(supabase);
+  checkWeekIndex(cycle, weekIndex);
+  const weeks = await getCycleWeeks(supabase, cycle.id);
+  const current = weeks.find((w) => w.week_index === weekIndex);
+  if (!current) throw new Error("Ten tydzień nie ma jeszcze planu – najpierw go zaplanuj.");
+  return { cycle, current };
 }
 
 function checkWeekIndex(cycle: Cycle | null, weekIndex: number): asserts cycle is Cycle {
@@ -228,14 +251,16 @@ export async function planWeek(
   const cycle = await getActiveCycle(supabase);
   checkWeekIndex(cycle, input.numer_tygodnia);
   const weekStart = shiftDays(cycle.start_date, (input.numer_tygodnia - 1) * 7);
-  const context = await weekPlanningContext(supabase, cycle, input.numer_tygodnia);
+  const { snapshot, details } = await weekPlanningContext(supabase, cycle, input.numer_tygodnia);
 
   const answer = await askCoach({
     model: MODELS.cycle,
     system: PLANNER_SYSTEM,
     effort: "high",
     schema: WeekPlanSchema,
-    prompt: `${context}
+    context: snapshot,
+    log: { supabase, operation: "plan_tygodnia" },
+    prompt: `${details}
 
 # Zadanie
 Rozpisz tydzień ${input.numer_tygodnia} cyklu (od poniedziałku ${weekStart} do niedzieli ${shiftDays(weekStart, 6)}).
@@ -251,35 +276,79 @@ ${input.uwagi || "brak"}`,
   return `Zapisano plan tygodnia ${input.numer_tygodnia}:\n${weekToText(answer.data, weekStart)}`;
 }
 
+// Prosta poprawka treści (Sonnet): odchudzone dane, wraca tylko zmienione dni.
 export async function reviseWeek(
   supabase: SupabaseClient,
   userId: string,
   input: { numer_tygodnia: number; zmiany: string },
 ) {
-  const cycle = await getActiveCycle(supabase);
-  checkWeekIndex(cycle, input.numer_tygodnia);
-  const weeks = await getCycleWeeks(supabase, cycle.id);
-  const current = weeks.find((w) => w.week_index === input.numer_tygodnia);
-  if (!current) throw new Error("Ten tydzień nie ma jeszcze planu – najpierw go zaplanuj.");
-  const context = await weekPlanningContext(supabase, cycle, input.numer_tygodnia);
+  const { cycle, current } = await loadWeek(supabase, input.numer_tygodnia);
+  const snapshot = await buildCoachSnapshot(supabase, 7);
+  const weekOutline = cycle.outline?.tygodnie.find((w) => w.numer === input.numer_tygodnia);
 
   const answer = await askCoach({
-    model: MODELS.cycle,
+    model: MODELS.edit,
     system: PLANNER_SYSTEM,
-    effort: "high",
-    schema: WeekPlanSchema,
-    prompt: `${context}
+    effort: "medium",
+    schema: WeekEditSchema,
+    log: { supabase, operation: "poprawka_tygodnia" },
+    prompt: `${snapshot}
+
+# Założenia tego tygodnia w cyklu
+${weekOutline ? `${weekOutline.akcent} – ${weekOutline.opis} Docelowo ok. ${weekOutline.docelowe_tss} TSS.` : "brak"}
 
 # Obecny plan tygodnia ${input.numer_tygodnia} (od ${current.week_start})
-${JSON.stringify(current.plan)}
+${JSON.stringify(current.plan.dni)}
 
 # Zadanie
-Popraw powyższy plan zgodnie z prośbą zawodnika. Zmieniaj tylko to, co wynika z prośby (i to, co trzeba dostosować, żeby tydzień nadal miał sens), resztę zostaw bez zmian.
+Popraw plan zgodnie z prośbą zawodnika. Zwróć TYLKO dni, które się zmieniają (każdy w pełnej postaci, z segmentami i komentarzami). Zmieniaj tylko to, co wynika z prośby – i ewentualnie to, co trzeba dostosować, żeby tydzień nadal miał sens.
 
 Prośba zawodnika:
 ${input.zmiany}`,
   });
 
-  await saveWeek(supabase, userId, cycle, input.numer_tygodnia, answer.data);
-  return `Zapisano poprawiony plan tygodnia ${input.numer_tygodnia}:\n${weekToText(answer.data, current.week_start)}`;
+  const changed = new Map(answer.data.dni.map((d) => [d.dzien, d]));
+  const plan: WeekPlan = {
+    ...current.plan,
+    dni: current.plan.dni.map((d) => changed.get(d.dzien) ?? d),
+  };
+  await saveWeek(supabase, userId, cycle, input.numer_tygodnia, plan);
+  return `Zapisano poprawkę tygodnia ${input.numer_tygodnia} (${answer.data.opis_zmian}).
+Zmienione dni: ${[...changed.keys()].map((d) => WEEKDAY_NAMES[d]).join(", ") || "brak"}.
+${weekToText(plan, current.week_start)}`;
+}
+
+// Przesunięcie / zamiana / usunięcie treningu – bez AI, za darmo.
+export async function moveWorkout(
+  supabase: SupabaseClient,
+  userId: string,
+  input: {
+    numer_tygodnia: number;
+    operacja: "przesun" | "zamien" | "usun";
+    z_dnia: PlanDay["dzien"];
+    na_dzien: PlanDay["dzien"] | "brak";
+  },
+) {
+  const { cycle, current } = await loadWeek(supabase, input.numer_tygodnia);
+  const days = new Map(current.plan.dni.map((d) => [d.dzien, d]));
+  const from = days.get(input.z_dnia) ?? REST_DAY(input.z_dnia);
+
+  if (input.operacja === "usun") {
+    days.set(input.z_dnia, REST_DAY(input.z_dnia));
+  } else {
+    if (input.na_dzien === "brak" || input.na_dzien === input.z_dnia) {
+      throw new Error("Podaj inny dzień docelowy.");
+    }
+    const to = days.get(input.na_dzien) ?? REST_DAY(input.na_dzien);
+    // Przesunięcie na dzień z treningiem = zamiana miejscami.
+    days.set(input.na_dzien, { ...from, dzien: input.na_dzien });
+    days.set(input.z_dnia, { ...to, dzien: input.z_dnia });
+  }
+
+  const plan: WeekPlan = {
+    ...current.plan,
+    dni: WEEKDAYS.map((d) => days.get(d) ?? REST_DAY(d)),
+  };
+  await saveWeek(supabase, userId, cycle, input.numer_tygodnia, plan);
+  return `Zapisano zmianę w tygodniu ${input.numer_tygodnia}.\n${weekToText(plan, current.week_start)}`;
 }

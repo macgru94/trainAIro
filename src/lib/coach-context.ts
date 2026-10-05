@@ -141,10 +141,11 @@ export function nextMonday(fromIso = todayIso()) {
   return d.toISOString().slice(0, 10);
 }
 
-// „Teczka” dla trenera w rozmowie: profil, 4 tygodnie danych z analizami, kalendarz.
-export async function buildCoachSnapshot(supabase: SupabaseClient) {
+// „Teczka” dla trenera: profil, ostatnie dni danych z analizami, kalendarz.
+// Domyślnie 28 dni (rozmowa, planowanie); do prostych poprawek wystarczy 7.
+export async function buildCoachSnapshot(supabase: SupabaseClient, days = 28) {
   const today = todayIso();
-  const from = shiftDays(today, -28);
+  const from = shiftDays(today, -days);
 
   const [{ data: wellnessRows }, { data: activityRows }, { data: analysisRows }, events] =
     await Promise.all([
@@ -198,10 +199,10 @@ export async function buildCoachSnapshot(supabase: SupabaseClient) {
 ## Profil
 ${profile ? JSON.stringify(profile) : "brak danych o FTP"}
 
-## Wellness – ostatnie 4 tygodnie (CTL = fitness, ATL = zmęczenie, TSB = świeżość)
+## Wellness – ostatnie ${days} dni (CTL = fitness, ATL = zmęczenie, TSB = świeżość)
 ${lines(wellness) || "brak danych"}
 
-## Aktywności – ostatnie 4 tygodnie (z werdyktem analizy dziennej, jeśli była)
+## Aktywności – ostatnie ${days} dni (z werdyktem analizy dziennej, jeśli była)
 ${lines(activities) || "brak"}
 
 ## Kalendarz intervals.icu – zaplanowane treningi na 14 dni

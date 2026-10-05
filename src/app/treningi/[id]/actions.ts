@@ -56,6 +56,7 @@ export async function analyzeActivity(activityId: string): Promise<AnalysisState
       prompt: dailyAnalysisPrompt(context, feelingsMissing, today),
       schema: DailyAnalysisSchema,
       maxTokens: 4000,
+      log: { supabase, operation: "analiza_dzienna" },
     });
 
     const { error } = await supabase.from("activity_analyses").upsert(

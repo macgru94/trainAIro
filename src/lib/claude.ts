@@ -1,19 +1,22 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
+import { logUsage, type Usage } from "@/lib/ai-usage";
 
 // Klient Claude – działa wyłącznie na serwerze.
 // Klucz jest czytany automatycznie ze zmiennej ANTHROPIC_API_KEY (.env.local).
 const anthropic = new Anthropic();
 
-// Model dla każdego poziomu analizy: im wyższy poziom, tym mądrzejszy (i droższy)
-// model – ale pracuje na krótkich podsumowaniach z poziomu niżej.
+// Model dla każdego zadania: Opus tylko do dużych zadań (pełny tydzień, cykl),
+// proste rzeczy robią tańsze modele.
 export const MODELS = {
   daily: "claude-haiku-4-5", // analiza pojedynczego treningu
   weekly: "claude-sonnet-5-5", // podsumowanie tygodnia
   chat: "claude-sonnet-5-5", // rozmowa na stronie „Trener”
-  cycle: "claude-opus-5-5", // plan cyklu, planów tygodni i ich poprawki
+  edit: "claude-sonnet-5-5", // proste poprawki planu tygodnia
+  cycle: "claude-opus-5-5", // plan cyklu i pełne plany tygodni
 } as const;
 
 export type CoachModel = (typeof MODELS)[keyof typeof MODELS];
@@ -21,10 +24,15 @@ export type CoachModel = (typeof MODELS)[keyof typeof MODELS];
 type AskOptions<T extends z.ZodType> = {
   model: CoachModel;
   system: string;
+  // Duża, powtarzalna część danych (np. „teczka” zawodnika) – zapamiętywana w cache,
+  // więc kolejne zapytania w ciągu kilku minut płacą za nią ok. 10% ceny.
+  context?: string;
   prompt: string;
   schema: T;
   maxTokens?: number;
   effort?: "low" | "medium" | "high"; // tylko Sonnet / Opus
+  // Zapis zużycia do licznika kosztów (tabela ai_usage).
+  log?: { supabase: SupabaseClient; operation: string };
 };
 
 export type CoachAnswer<T> = {
@@ -62,10 +70,12 @@ export function streamCoachChat(
 export async function askCoach<T extends z.ZodType>({
   model,
   system,
+  context,
   prompt,
   schema,
   maxTokens = 16000,
   effort = "medium",
+  log,
 }: AskOptions<T>): Promise<CoachAnswer<z.infer<T>>> {
   // Haiku 4.5: bez myślenia i bez modelu zapasowego – szybko i tanio.
   // Sonnet / Opus: myślenie adaptacyjne + zapasowy model, gdyby model
@@ -83,14 +93,23 @@ export async function askCoach<T extends z.ZodType>({
       ? { format: zodOutputFormat(schema) }
       : { format: zodOutputFormat(schema), effort };
 
+  const content: Anthropic.Beta.BetaContentBlockParam[] = context
+    ? [
+        { type: "text", text: context, cache_control: { type: "ephemeral" } },
+        { type: "text", text: prompt },
+      ]
+    : [{ type: "text", text: prompt }];
+
   const response = await anthropic.beta.messages.parse({
     model,
     max_tokens: maxTokens,
     ...extra,
     output_config: outputConfig,
     system,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content }],
   });
+
+  if (log) await logUsage(log.supabase, log.operation, response.model, response.usage as Usage);
 
   if (response.stop_reason === "refusal") {
     throw new Error("Claude odmówił odpowiedzi na to zapytanie.");
