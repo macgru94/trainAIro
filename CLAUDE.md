@@ -50,6 +50,9 @@ Każdy poziom pracuje na ZAPISANYCH w bazie wynikach poziomu niżej – droższe
 - Odpowiedzi Claude w stałym formacie: structured outputs (`zod` + `zodOutputFormat`, schematy w `src/lib/analysis-schemas.ts`).
 - Sonnet/Opus: myślenie adaptacyjne + `fallbacks: "default"` (zapasowy model przy odmowie). Haiku: bez myślenia i bez fallbacku.
 - Brak odczuć (RPE/samopoczucie) → analiza prosi o ich uzupełnienie; w UI zachęta + przycisk „Analizuj mimo to”.
+- Strona `/trener`: rozmowa na `claude-sonnet-5-5` (endpoint `src/app/api/trener/route.ts`, streaming, pętla narzędzi). Narzędzia (`src/lib/coach-tools.ts`): `zaplanuj_cykl`, `zaplanuj_tydzien`, `popraw_tydzien` → wywołują Opus w `src/lib/planning.ts` i zapisują do `training_cycles` / `planned_weeks`. Karty planu: `src/app/trener/plan-panel.tsx`.
+- Historia rozmowy jest append-only: wiadomości (`coach_messages.content`) odtwarzamy bez zmian (wymóg modeli z myśleniem). Dane zawodnika trafiają tylko do pierwszej wiadomości rozmowy; świeże dane = „Nowa rozmowa”. Zmiana narzędzi lub CHAT_SYSTEM → zalecić nową rozmowę.
+- Plan tygodnia: moc w % FTP (bloki × powtórzenia × segmenty), dni jako `pon`…`nd` – daty liczy aplikacja (`week_start` + dzień).
 
 ## Przydatne polecenia
 - `npm run dev` – uruchamia stronę lokalnie pod adresem http://localhost:3000

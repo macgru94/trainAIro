@@ -205,10 +205,7 @@ ${lines(wellness) || "brak danych"}
 ${lines(activities) || "brak"}
 
 ## Kalendarz intervals.icu – zaplanowane treningi na 14 dni
-${lines(planned) || "brak zaplanowanych treningów"}
-
-## Cykl treningowy
-Brak aktywnego cyklu. Pierwszy 4-tygodniowy cykl ma się zacząć w poniedziałek ${nextMonday(today)}.`;
+${lines(planned) || "brak zaplanowanych treningów"}`;
 }
 
 export async function buildActivityAnalysisContext(

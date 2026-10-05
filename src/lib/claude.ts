@@ -24,6 +24,7 @@ type AskOptions<T extends z.ZodType> = {
   prompt: string;
   schema: T;
   maxTokens?: number;
+  effort?: "low" | "medium" | "high"; // tylko Sonnet / Opus
 };
 
 export type CoachAnswer<T> = {
@@ -36,8 +37,13 @@ export type CoachAnswer<T> = {
 // Rozmowa z trenerem (Sonnet 5.5) – odpowiedź przesyłana na bieżąco (streaming).
 // `messages` to cała dotychczasowa rozmowa: wiadomości odtwarzamy dokładnie w takiej
 // postaci, w jakiej je zapisaliśmy (bez edycji) – tego wymaga model z myśleniem.
-export function streamCoachChat(system: string, messages: Anthropic.Beta.BetaMessageParam[]) {
+export function streamCoachChat(
+  system: string,
+  messages: Anthropic.Beta.BetaMessageParam[],
+  tools: Anthropic.Beta.BetaTool[] = [],
+) {
   return anthropic.beta.messages.stream({
+    tools,
     model: MODELS.chat,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
@@ -59,6 +65,7 @@ export async function askCoach<T extends z.ZodType>({
   prompt,
   schema,
   maxTokens = 16000,
+  effort = "medium",
 }: AskOptions<T>): Promise<CoachAnswer<z.infer<T>>> {
   // Haiku 4.5: bez myślenia i bez modelu zapasowego – szybko i tanio.
   // Sonnet / Opus: myślenie adaptacyjne + zapasowy model, gdyby model
@@ -71,12 +78,16 @@ export async function askCoach<T extends z.ZodType>({
           fallbacks: "default" as const,
           thinking: { type: "adaptive" as const },
         };
+  const outputConfig =
+    model === MODELS.daily
+      ? { format: zodOutputFormat(schema) }
+      : { format: zodOutputFormat(schema), effort };
 
   const response = await anthropic.beta.messages.parse({
     model,
     max_tokens: maxTokens,
     ...extra,
-    output_config: { format: zodOutputFormat(schema) },
+    output_config: outputConfig,
     system,
     messages: [{ role: "user", content: prompt }],
   });
