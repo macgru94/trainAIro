@@ -20,6 +20,57 @@ export type IntervalsActivity = {
   source?: string;
 };
 
+export type IntervalsInterval = {
+  id: number;
+  type?: string; // np. WORK, RECOVERY
+  label?: string | null;
+  moving_time?: number;
+  elapsed_time?: number;
+  distance?: number;
+  average_watts?: number;
+  weighted_average_watts?: number;
+  max_watts?: number;
+  intensity?: number;
+  zone?: number;
+  average_heartrate?: number;
+  max_heartrate?: number;
+  average_cadence?: number;
+};
+
+// Pełne dane jednego treningu (tylko pola, których używamy).
+export type IntervalsActivityDetail = IntervalsActivity & {
+  elapsed_time?: number;
+  total_elevation_gain?: number;
+  average_speed?: number;
+  max_heartrate?: number;
+  average_cadence?: number;
+  calories?: number;
+  icu_joules?: number;
+  icu_ftp?: number;
+  lthr?: number;
+  icu_weight?: number;
+  icu_intensity?: number;
+  icu_variability_index?: number;
+  icu_efficiency_factor?: number;
+  decoupling?: number;
+  polarization_index?: number;
+  icu_rpe?: number | null;
+  session_rpe?: number | null;
+  feel?: number | null;
+  icu_power_zones?: number[] | null; // górne granice stref w % FTP
+  icu_hr_zones?: number[] | null; // górne granice stref w bpm
+  icu_zone_times?: { id: string; secs: number }[] | null;
+  icu_hr_zone_times?: number[] | null;
+  icu_intervals?: IntervalsInterval[] | null;
+};
+
+export type IntervalsMessage = {
+  id: number;
+  name?: string;
+  created?: string;
+  content?: string;
+};
+
 function getConfig() {
   const apiKey = process.env.INTERVALS_API_KEY;
   const athleteId = process.env.INTERVALS_ATHLETE_ID;
@@ -65,5 +116,17 @@ export async function getActivities(days = 30) {
   // Najnowsze na górze.
   return activities.sort((a, b) =>
     (b.start_date_local ?? "").localeCompare(a.start_date_local ?? ""),
+  );
+}
+
+export async function getActivity(id: string) {
+  return intervalsFetch<IntervalsActivityDetail>(
+    `/activity/${encodeURIComponent(id)}?intervals=true`,
+  );
+}
+
+export async function getActivityMessages(id: string) {
+  return intervalsFetch<IntervalsMessage[]>(
+    `/activity/${encodeURIComponent(id)}/messages`,
   );
 }
