@@ -173,6 +173,27 @@ export async function getWellness(days = 30) {
   );
 }
 
+// Wydarzenie z kalendarza intervals.icu (np. zaplanowany trening).
+export type IntervalsEvent = {
+  id: number;
+  category?: string; // WORKOUT, NOTE, RACE_A …
+  start_date_local?: string;
+  name?: string;
+  description?: string | null;
+  type?: string;
+  moving_time?: number;
+  icu_training_load?: number;
+  indoor?: boolean;
+};
+
+// Wydarzenia z kalendarza w zakresie dat (RRRR-MM-DD, włącznie).
+export async function getEvents(oldest: string, newest: string) {
+  const { athleteId } = getConfig();
+  return intervalsFetch<IntervalsEvent[]>(
+    `/athlete/${athleteId}/events?oldest=${oldest}&newest=${newest}`,
+  );
+}
+
 export async function getActivity(id: string) {
   return intervalsFetch<IntervalsActivityDetail>(
     `/activity/${encodeURIComponent(id)}?intervals=true`,

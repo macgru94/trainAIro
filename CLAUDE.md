@@ -35,10 +35,21 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 - [x] Etap 1: środowisko, projekt Next.js + Tailwind, CLAUDE.md, uruchomienie lokalne
 - [x] Etap 2: logowanie (Supabase, bez publicznej rejestracji) – `src/proxy.ts` chroni wszystkie strony poza `/login`
 - [x] Etap 3: dane z intervals.icu – lista + szczegóły treningu, filtr rowerowy, synchronizacja roku danych do bazy, wellness (`/forma`), edycja odczuć (RPE, samopoczucie, notatka) z zapisem do intervals.icu
-- [ ] Analizy treningów przez Claude
-- [ ] Czat z Claude znającym dane treningowe
-- [ ] Generowanie treningów i wysyłanie ich do intervals.icu
-- [ ] PWA i wdrożenie na Vercel
+- [ ] Etap 4: analizy przez Claude – D2 analiza dzienna (zrobione), D3 podsumowanie tygodnia
+- [ ] Etap 5: cykl treningowy (4 tygodnie) – wywiad (dostępność, jazdy na dworze/trenażer, cel), plan od Opus, wysyłka do intervals.icu, test co miesiąc
+- [ ] Etap 6: czat z Claude znającym dane treningowe
+- [ ] Etap 7: PWA i wdrożenie na Vercel
+
+## Architektura trenera AI (ustalona z użytkownikiem)
+Każdy poziom pracuje na ZAPISANYCH w bazie wynikach poziomu niżej – droższe modele dostają krótkie podsumowania zamiast surowych danych (oszczędność).
+| Poziom | Model (`MODELS` w `src/lib/claude.ts`) | Wejście | Wynik |
+|---|---|---|---|
+| Dzienny (po treningu) | `claude-haiku-4-5` | surowe dane treningu, 21 dni wellness, 28 dni aktywności, plan na 7 dni z kalendarza intervals.icu | tabela `activity_analyses`: mocne/słabe strony, ocena odczuć, werdykt (`bez_zmian`/`drobna_korekta`/`zmiana_planu`/`odpoczynek`), rekomendacja |
+| Tygodniowy | `claude-sonnet-5-5` | analizy dzienne z tygodnia + statystyki tygodnia | podsumowanie tygodnia (do zrobienia) |
+| Cykl (4 tygodnie) | `claude-opus-5-5` | podsumowania 4 ostatnich tygodni + wywiad | plan cyklu → intervals.icu (do zrobienia) |
+- Odpowiedzi Claude w stałym formacie: structured outputs (`zod` + `zodOutputFormat`, schematy w `src/lib/analysis-schemas.ts`).
+- Sonnet/Opus: myślenie adaptacyjne + `fallbacks: "default"` (zapasowy model przy odmowie). Haiku: bez myślenia i bez fallbacku.
+- Brak odczuć (RPE/samopoczucie) → analiza prosi o ich uzupełnienie; w UI zachęta + przycisk „Analizuj mimo to”.
 
 ## Przydatne polecenia
 - `npm run dev` – uruchamia stronę lokalnie pod adresem http://localhost:3000

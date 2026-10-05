@@ -6,6 +6,10 @@ import {
   type IntervalsActivityDetail,
   type IntervalsMessage,
 } from "@/lib/intervals";
+import ReactMarkdown from "react-markdown";
+import { createClient } from "@/lib/supabase/server";
+import { isVerdict, VERDICT_LABELS, VERDICT_STYLES } from "@/lib/verdicts";
+import { AnalyzeButton } from "./analyze-button";
 import { FeelingsForm } from "./feelings-form";
 import {
   formatClock,
@@ -13,6 +17,23 @@ import {
   formatDistance,
   formatDuration,
 } from "@/lib/format";
+
+type DailyAnalysisData = {
+  podsumowanie: string;
+  mocne_strony: string[];
+  slabe_strony: string[];
+  odczucia: string;
+  werdykt: string;
+  rekomendacja: string;
+};
+
+type Analysis = {
+  content: string;
+  created_at: string;
+  model: string | null;
+  verdict: string | null;
+  data: DailyAnalysisData | null;
+};
 
 const POWER_ZONE_NAMES: Record<string, string> = {
   Z1: "Regeneracja",
@@ -35,6 +56,13 @@ export default async function TreningPage(props: PageProps<"/treningi/[id]">) {
   let messages: IntervalsMessage[] = [];
   let error: string | null = null;
 
+  const supabase = await createClient();
+  const analysisQuery = supabase
+    .from("activity_analyses")
+    .select("content, created_at, model, verdict, data")
+    .eq("activity_id", id)
+    .maybeSingle();
+
   try {
     [activity, messages] = await Promise.all([
       getActivity(id),
@@ -43,6 +71,8 @@ export default async function TreningPage(props: PageProps<"/treningi/[id]">) {
   } catch (e) {
     error = e instanceof Error ? e.message : "Nieznany błąd";
   }
+
+  const { data: analysis } = await analysisQuery;
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
@@ -55,7 +85,7 @@ export default async function TreningPage(props: PageProps<"/treningi/[id]">) {
           Nie udało się pobrać treningu: {error}
         </p>
       ) : (
-        <ActivityDetail activity={activity} messages={messages} />
+        <ActivityDetail activity={activity} messages={messages} analysis={analysis} />
       )}
     </main>
   );
@@ -64,9 +94,11 @@ export default async function TreningPage(props: PageProps<"/treningi/[id]">) {
 function ActivityDetail({
   activity: a,
   messages,
+  analysis,
 }: {
   activity: IntervalsActivityDetail;
   messages: IntervalsMessage[];
+  analysis: Analysis | null;
 }) {
   const workIntervals = (a.icu_intervals ?? []).filter((i) => i.type === "WORK");
 
@@ -127,6 +159,36 @@ function ActivityDetail({
         />
       </Section>
 
+      <Section title="Analiza trenera">
+        {analysis ? (
+          <>
+            {analysis.data ? (
+              <DailyAnalysisView data={analysis.data} />
+            ) : (
+              // Starsze analizy (sprzed zmiany formatu) były zwykłym tekstem Markdown.
+              <div className="text-sm leading-relaxed text-zinc-800 [&_blockquote]:my-3 [&_blockquote]:rounded-lg [&_blockquote]:bg-amber-50 [&_blockquote]:p-3 [&_blockquote]:text-amber-900 [&_h2]:mt-4 [&_h2]:mb-1 [&_h2]:font-semibold [&_h2]:text-zinc-900 [&_li]:mt-1 [&_p]:mt-2 [&_strong]:text-zinc-900 [&_ul]:list-disc [&_ul]:pl-5">
+                <ReactMarkdown>{analysis.content}</ReactMarkdown>
+              </div>
+            )}
+            <p className="mt-4 text-xs text-zinc-400">
+              {formatDate(analysis.created_at)} · {analysis.model}
+            </p>
+            <div className="mt-3">
+              <AnalyzeButton activityId={String(a.id)} label="Przygotuj nową analizę" secondary />
+            </div>
+          </>
+        ) : hasFeelings(a) ? (
+          <AnalyzeButton activityId={String(a.id)} label="Analizuj trening" />
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-zinc-600">
+              Najpierw uzupełnij odczucia powyżej – z nimi analiza będzie dużo trafniejsza.
+            </p>
+            <AnalyzeButton activityId={String(a.id)} label="Analizuj mimo to" secondary />
+          </>
+        )}
+      </Section>
+
       <PowerZones activity={a} />
       <HeartRateZones activity={a} />
 
@@ -182,6 +244,47 @@ function ActivityDetail({
         )}
       </Section>
     </>
+  );
+}
+
+function DailyAnalysisView({ data }: { data: DailyAnalysisData }) {
+  const verdict = isVerdict(data.werdykt) ? data.werdykt : null;
+  return (
+    <div className="flex flex-col gap-4 text-sm leading-relaxed text-zinc-800">
+      {verdict && (
+        <p className={`self-start rounded-full px-3 py-1 text-sm font-medium ${VERDICT_STYLES[verdict]}`}>
+          {VERDICT_LABELS[verdict]}
+        </p>
+      )}
+      <p>{data.podsumowanie}</p>
+      <AnalysisList title="Mocne strony" items={data.mocne_strony} marker="✓" />
+      <AnalysisList title="Słabe strony" items={data.slabe_strony} marker="!" />
+      <div>
+        <p className="font-medium text-zinc-900">Odczucia</p>
+        <p className="mt-1">{data.odczucia}</p>
+      </div>
+      <div className="rounded-lg bg-zinc-50 p-3">
+        <p className="font-medium text-zinc-900">Co dalej</p>
+        <p className="mt-1">{data.rekomendacja}</p>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisList({ title, items, marker }: { title: string; items: string[]; marker: string }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p className="font-medium text-zinc-900">{title}</p>
+      <ul className="mt-1 flex flex-col gap-1">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="shrink-0 text-zinc-400">{marker}</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
