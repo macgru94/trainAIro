@@ -1,8 +1,18 @@
 import Link from "next/link";
-import { isCycling, type IntervalsActivity } from "@/lib/intervals";
+import { hasFeelings, isCycling, type IntervalsActivity } from "@/lib/intervals";
 import { formatDate, formatDistance, formatDuration } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { SyncButton } from "@/components/sync-button";
+
+// Przypominamy o odczuciach tylko dla jazd z ostatnich 14 dni –
+// starszych treningów i tak trudno wiarygodnie ocenić z pamięci.
+const FEELINGS_REMINDER_DAYS = 14;
+
+function needsFeelings(a: IntervalsActivity) {
+  if (!isCycling(a) || hasFeelings(a) || !a.start_date_local) return false;
+  const ageMs = Date.now() - new Date(a.start_date_local).getTime();
+  return ageMs < FEELINGS_REMINDER_DAYS * 24 * 60 * 60 * 1000;
+}
 
 export default async function TreningiPage(props: PageProps<"/treningi">) {
   const { typ } = await props.searchParams;
@@ -89,7 +99,13 @@ export default async function TreningiPage(props: PageProps<"/treningi">) {
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
-                ) : (
+                ) : null}
+                {a.name && needsFeelings(a) && (
+                  <p className="mt-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    Uzupełnij odczucia
+                  </p>
+                )}
+                {!a.name && (
                   <p className="mt-1 text-sm text-amber-700">
                     Szczegóły niedostępne przez API{a.source ? ` (źródło: ${a.source})` : ""}.
                   </p>

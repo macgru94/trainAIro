@@ -18,6 +18,9 @@ export type IntervalsActivity = {
   average_heartrate?: number;
   description?: string | null;
   source?: string;
+  icu_rpe?: number | null;
+  session_rpe?: number | null; // RPE × minuty (obciążenie sesji), nie skala 1–10
+  feel?: number | null;
 };
 
 // Typy aktywności intervals.icu, które traktujemy jako jazdę na rowerze.
@@ -71,9 +74,6 @@ export type IntervalsActivityDetail = IntervalsActivity & {
   icu_efficiency_factor?: number;
   decoupling?: number;
   polarization_index?: number;
-  icu_rpe?: number | null;
-  session_rpe?: number | null;
-  feel?: number | null;
   icu_power_zones?: number[] | null; // górne granice stref w % FTP
   icu_hr_zones?: number[] | null; // górne granice stref w bpm
   icu_zone_times?: { id: string; secs: number }[] | null;
@@ -99,13 +99,17 @@ function getConfig() {
   return { apiKey, athleteId };
 }
 
-async function intervalsFetch<T>(path: string): Promise<T> {
+async function intervalsFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const { apiKey } = getConfig();
   // intervals.icu używa logowania Basic: użytkownik "API_KEY", hasło = klucz.
   const auth = Buffer.from(`API_KEY:${apiKey}`).toString("base64");
 
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Basic ${auth}` },
+    ...init,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+    },
     cache: "no-store",
   });
 
@@ -173,6 +177,25 @@ export async function getActivity(id: string) {
   return intervalsFetch<IntervalsActivityDetail>(
     `/activity/${encodeURIComponent(id)}?intervals=true`,
   );
+}
+
+export type ActivityFeelings = {
+  icu_rpe: number | null; // 1–10
+  feel: number | null; // 1 = bardzo dobrze … 5 = bardzo słabo
+  description: string | null;
+};
+
+// Zapisuje odczucia po treningu w intervals.icu.
+export async function updateActivityFeelings(id: string, feelings: ActivityFeelings) {
+  return intervalsFetch<IntervalsActivityDetail>(
+    `/activity/${encodeURIComponent(id)}`,
+    { method: "PUT", body: JSON.stringify(feelings) },
+  );
+}
+
+// Czy trening ma uzupełnione odczucia (RPE lub samopoczucie)?
+export function hasFeelings(a: Pick<IntervalsActivity, "icu_rpe" | "feel">) {
+  return a.icu_rpe != null || a.feel != null;
 }
 
 export async function getActivityMessages(id: string) {

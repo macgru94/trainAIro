@@ -34,7 +34,7 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 ## Plan etapów
 - [x] Etap 1: środowisko, projekt Next.js + Tailwind, CLAUDE.md, uruchomienie lokalne
 - [x] Etap 2: logowanie (Supabase, bez publicznej rejestracji) – `src/proxy.ts` chroni wszystkie strony poza `/login`
-- [ ] Etap 3: dane z intervals.icu – zrobione: lista + szczegóły treningu, filtr rowerowy, synchronizacja do bazy; do zrobienia: wellness
+- [x] Etap 3: dane z intervals.icu – lista + szczegóły treningu, filtr rowerowy, synchronizacja roku danych do bazy, wellness (`/forma`), edycja odczuć (RPE, samopoczucie, notatka) z zapisem do intervals.icu
 - [ ] Analizy treningów przez Claude
 - [ ] Czat z Claude znającym dane treningowe
 - [ ] Generowanie treningów i wysyłanie ich do intervals.icu
@@ -51,4 +51,5 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 - Klient Supabase po stronie serwera: `src/lib/supabase/server.ts`. Zmienne: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 - Baza: skrypty SQL w `supabase/migrations/` – użytkownik uruchamia je ręcznie w Supabase → SQL Editor. Każda tabela ma RLS (dostęp tylko dla `auth.uid() = user_id`).
 - Tabela `activities` przechowuje WSZYSTKIE aktywności (kolumna `raw` = pełny JSON z intervals.icu); filtr rowerowy (`isCycling` w `src/lib/intervals.ts`) działa przy wyświetlaniu.
+- Edycja plików z polskimi znakami: używaj narzędzi Edit/Write, nie `Get-Content | Set-Content` w PowerShell 5.1 (psuje UTF-8).
 - Nie uruchamiaj `npm audit fix --force` bez konsultacji – może zepsuć zależności.

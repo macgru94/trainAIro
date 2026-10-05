@@ -2,9 +2,11 @@ import Link from "next/link";
 import {
   getActivity,
   getActivityMessages,
+  hasFeelings,
   type IntervalsActivityDetail,
   type IntervalsMessage,
 } from "@/lib/intervals";
+import { FeelingsForm } from "./feelings-form";
 import {
   formatClock,
   formatDate,
@@ -21,15 +23,6 @@ const POWER_ZONE_NAMES: Record<string, string> = {
   Z6: "Beztlenowa",
   Z7: "Neuromięśniowa",
   SS: "Sweet Spot",
-};
-
-// Skala samopoczucia w intervals.icu: 1 = najlepiej, 5 = najgorzej.
-const FEEL_LABELS: Record<number, string> = {
-  1: "Bardzo dobrze",
-  2: "Dobrze",
-  3: "Normalnie",
-  4: "Słabo",
-  5: "Bardzo słabo",
 };
 
 const round = (v?: number | null, digits = 0) =>
@@ -76,7 +69,6 @@ function ActivityDetail({
   messages: IntervalsMessage[];
 }) {
   const workIntervals = (a.icu_intervals ?? []).filter((i) => i.type === "WORK");
-  const rpe = a.icu_rpe ?? a.session_rpe;
 
   return (
     <>
@@ -121,16 +113,18 @@ function ActivityDetail({
       </Section>
 
       <Section title="Odczucia">
-        <dl className="grid grid-cols-2 gap-3">
-          <Stat label="RPE (wysiłek 1–10)" value={rpe} />
-          <Stat label="Samopoczucie" value={a.feel ? FEEL_LABELS[a.feel] : null} />
-        </dl>
-        <div className="mt-3">
-          <p className="text-xs text-zinc-500">Notatka</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">
-            {a.description?.trim() || "Brak notatki."}
+        {!hasFeelings(a) && (
+          <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            Nie uzupełniono odczuć. Dodaj RPE i samopoczucie – bez nich analiza
+            treningu będzie mniej trafna.
           </p>
-        </div>
+        )}
+        <FeelingsForm
+          activityId={String(a.id)}
+          initialRpe={a.icu_rpe ?? null}
+          initialFeel={a.feel ?? null}
+          initialDescription={a.description ?? ""}
+        />
       </Section>
 
       <PowerZones activity={a} />
