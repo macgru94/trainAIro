@@ -33,7 +33,7 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 
 ## Plan etapów
 - [x] Etap 1: środowisko, projekt Next.js + Tailwind, CLAUDE.md, uruchomienie lokalne
-- [ ] Logowanie (Supabase, bez publicznej rejestracji)
+- [x] Etap 2: logowanie (Supabase, bez publicznej rejestracji) – `src/proxy.ts` chroni wszystkie strony poza `/login`
 - [ ] Pobieranie danych z intervals.icu
 - [ ] Analizy treningów przez Claude
 - [ ] Czat z Claude znającym dane treningowe
@@ -47,4 +47,6 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 
 ## Uwagi techniczne
 - Nazwa paczki w `package.json` to `trainairo` (npm nie pozwala na wielkie litery).
+- Next.js 16: plik `middleware.ts` nazywa się teraz `proxy.ts` (funkcja `proxy`).
+- Klient Supabase po stronie serwera: `src/lib/supabase/server.ts`. Zmienne: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 - Nie uruchamiaj `npm audit fix --force` bez konsultacji – może zepsuć zależności.
