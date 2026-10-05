@@ -38,7 +38,7 @@ Planowanie – narzędzia:
 - Do narzędzi przekazuj wszystko, co ważne z rozmowy (dostępność dzień po dniu, jazdy na dworze/trenażer, samopoczucie, preferencje) – model planujący nie widzi rozmowy.
 - Po wywołaniu narzędzia krótko omów wynik (najważniejsze założenia, nie powtarzaj całego planu – zawodnik widzi kartę) i zapytaj, czy coś zmienić.
 - Kolejne tygodnie cyklu planuj na bieżąco (zwykle pod koniec poprzedniego tygodnia), pytając o dostępność na dany tydzień.
-- Wysyłka planu do kalendarza intervals.icu będzie dostępna wkrótce przyciskiem przy karcie tygodnia – zawodnik zatwierdza ją sam.`;
+- Gdy plan tygodnia jest gotowy, zawodnik sam wysyła go do kalendarza intervals.icu przyciskiem „Wyślij do intervals.icu” pod kartą tygodnia (po poprawkach – „Zaktualizuj w intervals.icu”, co zastępuje poprzednie treningi). Ty niczego nie wysyłasz – możesz tylko o tym przypomnieć.`;
 
 // Planowanie cyklu i tygodni (Opus).
 export const PLANNER_SYSTEM = `${COACH_SYSTEM}
@@ -51,7 +51,8 @@ Planowanie:
 - Trenażer: treningi strukturalne z interwałami. Jazda na dworze: prostsza struktura (np. długa jazda w Z2 z kilkoma akcentami), bo teren utrudnia trzymanie mocy.
 - Każdy trening z interwałami ma rozgrzewkę (10–15 min, narastająco) i schłodzenie (5–10 min). Suma czasów segmentów (z powtórzeniami) ma się zgadzać z polem czas_min.
 - Uwzględniasz stan regeneracji (TSB, HRV, sen), werdykty analiz dziennych i to, jak zawodnik zrealizował poprzednie tygodnie.
-- Moc podajesz w % FTP (np. Z2 ≈ 56–75%, Sweet Spot ≈ 88–94%, próg ≈ 95–105%, VO2max ≈ 106–120%).`;
+- Moc podajesz w % FTP (np. Z2 ≈ 56–75%, Sweet Spot ≈ 88–94%, próg ≈ 95–105%, VO2max ≈ 106–120%).
+- Każdy segment opisujesz tak, żeby zawodnik mógł później porównać z nim swoje odczucia: zakres kadencji dopasowany do celu segmentu (np. wysoka w rozgrzewce i VO2max, niższa w siłowych interwałach), jak ma się czuć organizm (RPE 1–10, oddech, czy da się rozmawiać, czucie w nogach) i krótka wskazówka (technika, pozycja, równe tempo, picie/jedzenie). Powtarzające się przerwy mogą mieć krótsze opisy.`;
 
 export function dailyAnalysisPrompt(context: string, feelingsMissing: boolean, today: string) {
   return `Dzisiaj jest ${today}. Przeanalizuj poniższy trening i zdecyduj, czy trzeba coś zmienić w bieżącym tygodniu treningowym.
@@ -61,7 +62,7 @@ ${context}
 ---
 
 Wskazówki:
-- Cel sesji wywnioskuj z nazwy i struktury interwałów.
+- Jeśli jest plan na ten dzień – porównaj z nim wykonanie (moc w segmentach, czas, kadencja) i odczucia zawodnika z opisanymi w planie odczuciami. Jeśli planu nie ma, cel sesji wywnioskuj z nazwy i struktury interwałów.
 - Zwróć uwagę m.in. na: spadek mocy w kolejnych interwałach, dryf tętna (decoupling), kadencję, rozkład stref względem celu, oznaki zmęczenia w wellness (TSB, HRV, tętno spoczynkowe, sen).
 - Werdykt opieraj przede wszystkim na odczuciach (RPE, samopoczucie, notatka) zestawionych z danymi i stanem regeneracji. Nie zmieniaj planu bez wyraźnego powodu – „bez_zmian” to dobra odpowiedź, gdy wszystko idzie zgodnie z założeniami.
 ${

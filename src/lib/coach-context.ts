@@ -235,11 +235,16 @@ export async function buildActivityAnalysisContext(
       .lt("start_date_local", activity.start_date_local ?? `${activityDate}T23:59:59`)
       .neq("id", activityId)
       .order("start_date_local", { ascending: true }),
-    getEvents(shiftDays(activityDate, 1), shiftDays(activityDate, 7)),
+    getEvents(activityDate, shiftDays(activityDate, 7)),
   ]);
 
-  const planned = events
-    .filter((e) => e.category === "WORKOUT")
+  const workouts = events.filter((e) => e.category === "WORKOUT");
+  // Plan na dzień treningu – z pełnym opisem (komentarze do segmentów), do porównania z wykonaniem.
+  const plannedToday = workouts
+    .filter((e) => e.start_date_local?.slice(0, 10) === activityDate)
+    .map((e) => ({ ...plannedSummary(e), opis: e.description?.trim().slice(0, 4000) }));
+  const planned = workouts
+    .filter((e) => (e.start_date_local?.slice(0, 10) ?? "") > activityDate)
     .map(plannedSummary);
 
   const wellness = (wellnessRows ?? []).map((r) => wellnessSummary(r.raw as IntervalsWellness));
@@ -252,6 +257,9 @@ export async function buildActivityAnalysisContext(
   const text = `# Analizowany trening
 ${JSON.stringify(activityDetailSummary(activity))}
 
+# Plan na ten dzień (porównaj z wykonaniem: moc, czas, kadencja, odczucia)
+${lines(plannedToday) || "brak planu na ten dzień"}
+
 # Komentarze do treningu w intervals.icu
 ${comments || "brak"}
 
@@ -261,7 +269,7 @@ ${lines(wellness) || "brak danych"}
 # Wcześniejsze aktywności – ostatnie 4 tygodnie
 ${lines(recent) || "brak"}
 
-# Zaplanowane treningi na 7 dni po tym treningu
+# Zaplanowane treningi na kolejne 7 dni
 ${lines(planned) || "brak zaplanowanych treningów"}`;
 
   return { text, feelingsMissing: !hasFeelings(activity) };

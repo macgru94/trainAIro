@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { refreshTrener } from "./actions";
 
 export type ChatMessage = { role: "user" | "assistant"; text: string };
 
@@ -23,7 +23,6 @@ export function Chat({ initialConversationId, initialMessages }: Props) {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,7 +68,8 @@ export function Chat({ initialConversationId, initialMessages }: Props) {
     } finally {
       setPending(false);
       // Odświeżamy karty planu nad rozmową (trener mógł zapisać nowy plan).
-      router.refresh();
+      // Akcja serwerowa zwraca od razu świeże dane strony.
+      await refreshTrener().catch(() => {});
     }
   }
 

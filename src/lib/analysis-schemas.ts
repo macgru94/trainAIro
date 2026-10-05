@@ -81,13 +81,25 @@ export const WeekPlanSchema = z.object({
               powtorzenia: z.number().int().describe("Ile razy powtórzyć segmenty bloku (1 = bez powtórzeń)."),
               segmenty: z.array(
                 z.object({
+                  nazwa: z
+                    .string()
+                    .describe("Nazwa segmentu, 1–3 słowa, bez cyfr, np. „Rozgrzewka”, „Sweet Spot”, „Przerwa”, „Schłodzenie”."),
                   czas_s: z.number().int().describe("Czas segmentu w sekundach."),
                   moc_od_proc_ftp: z.number().int().describe("Dolna granica mocy w % FTP."),
                   moc_do_proc_ftp: z.number().int().describe("Górna granica mocy w % FTP (równa dolnej = stała moc)."),
                   narastajaco: z
                     .boolean()
                     .describe("true = moc rośnie płynnie od dolnej do górnej (np. rozgrzewka)."),
-                  kadencja: z.number().int().nullable().describe("Docelowa kadencja (rpm) albo null."),
+                  kadencja_od: z.number().int().describe("Dolna granica docelowej kadencji (rpm)."),
+                  kadencja_do: z.number().int().describe("Górna granica docelowej kadencji (rpm)."),
+                  odczucia: z
+                    .string()
+                    .describe(
+                      "Jak organizm powinien się czuć w tym segmencie: RPE (1–10), oddech, czy da się swobodnie mówić, czucie w nogach. Jedno–dwa zdania.",
+                    ),
+                  wskazowki: z
+                    .string()
+                    .describe("Na czym się skupić: technika, pozycja, równe tempo, picie/jedzenie… Jedno zdanie."),
                 }),
               ),
             }),

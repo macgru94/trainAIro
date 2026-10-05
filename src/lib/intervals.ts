@@ -194,6 +194,35 @@ export async function getEvents(oldest: string, newest: string) {
   );
 }
 
+export type NewWorkoutEvent = {
+  category: "WORKOUT";
+  start_date_local: string; // RRRR-MM-DDT00:00:00
+  type: string; // Ride / VirtualRide
+  name: string;
+  description: string;
+  moving_time: number; // sekundy
+  indoor: boolean;
+};
+
+// Tworzy zaplanowane treningi w kalendarzu (jednym zapytaniem).
+export async function createEvents(events: NewWorkoutEvent[]) {
+  const { athleteId } = getConfig();
+  return intervalsFetch<IntervalsEvent[]>(`/athlete/${athleteId}/events/bulk`, {
+    method: "POST",
+    body: JSON.stringify(events),
+  });
+}
+
+// Usuwa wydarzenie z kalendarza. Brak wydarzenia (już usunięte ręcznie) nie jest błędem.
+export async function deleteEvent(eventId: number) {
+  const { athleteId } = getConfig();
+  try {
+    await intervalsFetch<unknown>(`/athlete/${athleteId}/events/${eventId}`, { method: "DELETE" });
+  } catch (e) {
+    if (!(e instanceof Error && e.message.includes("404"))) throw e;
+  }
+}
+
 export async function getActivity(id: string) {
   return intervalsFetch<IntervalsActivityDetail>(
     `/activity/${encodeURIComponent(id)}?intervals=true`,

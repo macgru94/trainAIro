@@ -27,7 +27,8 @@ export type PlannedWeek = {
   week_index: number;
   week_start: string;
   plan: WeekPlan;
-  status: string;
+  status: string; // draft | sent
+  intervals_event_ids: number[] | null;
 };
 
 const WEEKDAY_NAMES: Record<(typeof WEEKDAYS)[number], string> = {
@@ -64,7 +65,7 @@ export async function getActiveCycle(supabase: SupabaseClient) {
 export async function getCycleWeeks(supabase: SupabaseClient, cycleId: string) {
   const { data } = await supabase
     .from("planned_weeks")
-    .select("id, week_index, week_start, plan, status")
+    .select("id, week_index, week_start, plan, status, intervals_event_ids")
     .eq("cycle_id", cycleId)
     .order("week_index", { ascending: true });
   return (data ?? []) as PlannedWeek[];
