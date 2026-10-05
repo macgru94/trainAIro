@@ -34,7 +34,7 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 ## Plan etapów
 - [x] Etap 1: środowisko, projekt Next.js + Tailwind, CLAUDE.md, uruchomienie lokalne
 - [x] Etap 2: logowanie (Supabase, bez publicznej rejestracji) – `src/proxy.ts` chroni wszystkie strony poza `/login`
-- [ ] Pobieranie danych z intervals.icu
+- [ ] Etap 3: dane z intervals.icu – zrobione: lista + szczegóły treningu, filtr rowerowy, synchronizacja do bazy; do zrobienia: wellness
 - [ ] Analizy treningów przez Claude
 - [ ] Czat z Claude znającym dane treningowe
 - [ ] Generowanie treningów i wysyłanie ich do intervals.icu
@@ -49,4 +49,6 @@ Prywatna strona (na razie tylko dla właściciela), działająca jak osobisty tr
 - Nazwa paczki w `package.json` to `trainairo` (npm nie pozwala na wielkie litery).
 - Next.js 16: plik `middleware.ts` nazywa się teraz `proxy.ts` (funkcja `proxy`).
 - Klient Supabase po stronie serwera: `src/lib/supabase/server.ts`. Zmienne: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- Baza: skrypty SQL w `supabase/migrations/` – użytkownik uruchamia je ręcznie w Supabase → SQL Editor. Każda tabela ma RLS (dostęp tylko dla `auth.uid() = user_id`).
+- Tabela `activities` przechowuje WSZYSTKIE aktywności (kolumna `raw` = pełny JSON z intervals.icu); filtr rowerowy (`isCycling` w `src/lib/intervals.ts`) działa przy wyświetlaniu.
 - Nie uruchamiaj `npm audit fix --force` bez konsultacji – może zepsuć zależności.

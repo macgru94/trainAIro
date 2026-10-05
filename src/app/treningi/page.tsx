@@ -1,19 +1,23 @@
 import Link from "next/link";
-import { getActivities, isCycling, type IntervalsActivity } from "@/lib/intervals";
+import { isCycling, type IntervalsActivity } from "@/lib/intervals";
 import { formatDate, formatDistance, formatDuration } from "@/lib/format";
+import { createClient } from "@/lib/supabase/server";
+import { SyncButton } from "./sync-button";
 
 export default async function TreningiPage(props: PageProps<"/treningi">) {
   const { typ } = await props.searchParams;
   const showAll = typ === "wszystkie";
 
-  let activities: IntervalsActivity[] = [];
-  let error: string | null = null;
+  // Czytamy z naszej bazy (RLS zwraca tylko wiersze zalogowanego użytkownika).
+  const supabase = await createClient();
+  const { data, error: dbError } = await supabase
+    .from("activities")
+    .select("raw")
+    .order("start_date_local", { ascending: false })
+    .limit(200);
 
-  try {
-    activities = await getActivities(30);
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Nieznany błąd";
-  }
+  const error = dbError?.message ?? null;
+  let activities = (data ?? []).map((row) => row.raw as IntervalsActivity);
 
   if (!showAll) {
     activities = activities.filter(isCycling);
@@ -21,13 +25,16 @@ export default async function TreningiPage(props: PageProps<"/treningi">) {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900">Treningi</h1>
-        <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-900">
-          ← Strona główna
-        </Link>
+      <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-900">
+        ← Strona główna
+      </Link>
+      <div className="mt-2 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Treningi</h1>
+          <p className="mt-1 text-sm text-zinc-500">Zapisane w bazie</p>
+        </div>
+        <SyncButton />
       </div>
-      <p className="mt-1 text-sm text-zinc-500">Ostatnie 30 dni z intervals.icu</p>
 
       <div className="mt-4 inline-flex rounded-lg bg-zinc-100 p-1 text-sm">
         <FilterLink href="/treningi" active={!showAll}>
@@ -46,7 +53,8 @@ export default async function TreningiPage(props: PageProps<"/treningi">) {
 
       {!error && activities.length === 0 && (
         <p className="mt-6 text-zinc-500">
-          {showAll ? "Brak treningów" : "Brak jazd na rowerze"} w ostatnich 30 dniach.
+          {showAll ? "Brak treningów" : "Brak jazd na rowerze"} w bazie. Kliknij
+          „Synchronizuj”, aby pobrać dane z intervals.icu.
         </p>
       )}
 
